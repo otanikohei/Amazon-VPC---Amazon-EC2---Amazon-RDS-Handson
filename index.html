@@ -1050,36 +1050,54 @@ mysql&gt; show databases;
 4 rows in set (0.004 sec)
 
 mysql&gt; exit</code></pre>
-
+<p>※ Aurora に接続しています。</p>
 
       </google-codelab-step>
     
-      <google-codelab-step label="フェーズ2 - MySQLのデータを移行" duration="0">
-        <h2 is-upgraded><strong>EC2 上の MySQL のデータをエクスポート</strong></h2>
-<p>EC2 インスタンス上にインストールされている MySQL からデータをエクスポートします。</p>
+      <google-codelab-step label="フェーズ2 - MariaDB のデータを移行" duration="0">
+        <h2 is-upgraded><strong>EC2 上の MariaDB データをエクスポート</strong></h2>
+        <p>EC2 に保存された MariaDB のデータをエクスポートして、Aurora にインポートしていきます。<br />
+                セッションマネージャーを開いて操作してください。</p>
+
+        <aside class="special"><p><strong>セッションマネージャーの有効期限が切れた場合は、再度ブラウザを開き直して以下の通り、root ユーザーに昇格してください。</strong></p>
+</aside>
+<pre><code>sh-5.1$ sudo -i
+#
+
+</code></pre>
+
+<p>EC2 インスタンス上にインストールされている MariaDB からデータをエクスポートします。</p>
+<p>tmp ディレクトリに移動します。</p>
+
 <pre><code># cd /tmp/
 # pwd
 /tmp
+</code></pre>
+
+<p>データをエクスポートします。</p>
+
+<pre><code>
 # mysqldump -u root -p wp_database &gt; export.sql
 Enter password: wordpress</code></pre>
+<p>※ EC2 上の MariaDB に接続しています。</p>
 
-<p>エクスポートできたか確認します。</p>
-
+<p>DB のデータがエクスポートできたか (ファイルが存在するか？) 確認します。</p>
 <pre><code>
 # ls -l export.sql
 -rw-r--r--. 1 root root 295916  4月 24 14:40 export.sql
 </code></pre>
 
-<p>export.sql がエクスポートできたら、EC2 インスタンス上の MySQL は今後使わないため停止します。</p>
+<p>export.sql がエクスポートできたら、EC2 インスタンスにて稼働している MariaDB は今後使わないため停止します。</p>
 <pre><code># systemctl stop mariadb
 # systemctl disable mariadb</code></pre>
-<h2 is-upgraded><strong>EC2 上の MySQL のデータを Aurora にインポート</strong></h2>
+<h2 is-upgraded><strong>MariaDB からエクスポートしたデータを Aurora にインポート</strong></h2>
 <p>エクスポートしたデータ (export.sql) を Aurora にインポートします。</p>
 <aside class="special"><p><strong>endpoint は先ほどメモした Aurora クラスターのライターインスタンスのエンドポイント名部分を入れてください。</strong></p>
 </aside>
 <pre><code># mysql -u admin -p -h endpoint wp_database &lt; export.sql
 Enter password:wordpress
 </code></pre>
+<p>※ Aurora に接続しています。</p>
 <aside class="warning"><p><strong>※データベースが存在しないエラーが出た場合は、Aurora 作成時にデータベースが作成できていない可能性があります。RDS ログイン後に create database wp_database; を実行して再試行してください。</strong></p>
 </aside>
 <p>インポートされた事を確認します。</p>
@@ -1104,17 +1122,18 @@ mysql&gt; show tables;
 | wp_terms              |
 | wp_usermeta           |
 | wp_users              |
+| wp_database           |
 +-----------------------+
-12 rows in set (0.001 sec)
+13 rows in set (0.001 sec)
 
 mysql&gt; exit
 </code></pre>
-
+<p>※ Aurora に接続しています。</p>
 
       </google-codelab-step>
     
       <google-codelab-step label="フェーズ2 - WordPress の DB 接続設定" duration="0">
-        <h2 is-upgraded><strong>WordPressのDB接続設定を削除</strong></h2>
+        <h2 is-upgraded><strong>WordPress の DB 接続設定を削除</strong></h2>
 <p>再設定をWebから行うため、DB接続設定を初期化します。</p>
 <p>設定ファイル(wp-config.php)をホームディレクトリに移動させます。こうすることで<code>/usr/share/nginx/html/wordpress/</code> から設定ファイルが消え、設定が初期化されます。</p>
 <pre><code># mv /usr/share/nginx/html/wordpress/wp-config.php ~/</code></pre>
@@ -1465,12 +1484,13 @@ mysql&gt; exit;
 <h2 is-upgraded>両方のサーバにリクエストがバランシングされるか確認</h2>
 <p>WEB サーバー #1、WEBサーバー #2 のそれぞれにセッションマネージャでログインし、以下のコマンドを実行してアクセスログを表示させることが可能です。</p>
 <p>ALB の定期的なヘルスチェックが実行されたり、WordPress でページをリロードするたびに双方の EC2 へアクセスされている状況を確認できます。</p>
-<pre><code># tail -f /var/log/nginx/access.log | grep -v &#34;ELB-HealthChecker/2.0&#34;
+<pre><code># tail -f /var/log/nginx/access.log | grep &#34;favicon.ico&#34;
 
 Ctrl + C で終了</code></pre>
 
+<aside class="special">ALB で維持設定を有効にしていないため、ファイル毎にラウンドロビンします。ここでは見やすくするために favicon.ico というファイルのみアクセスしたログのみ出力されるようにしています。</aside>
 
-      </google-codelab-step>
+</google-codelab-step>
     
       <google-codelab-step label="Option：ALB &#43; Web x 2 &#43; DB x 2 構成（サーバ 4 台構成）" duration="0">
         <h2 is-upgraded><strong>【オプションハンズオン】ALB + Web x 2 + DB x 2 構成（サーバ 4 台構成）</strong></h2>
@@ -1614,6 +1634,8 @@ aurora-mysql-db-reader.cfqns4hpf8id.ap-northeast-1.rds.amazonaws.com. 5 IN A 10.
 <li>ライターインスタンス (aurora-mysql-db-reader) にチェックを入れて、アクションから削除を選択します。バックアップのため、「最終スナップショットを作成しますか?」と表示されますが、今回は不要なのでチェックボックスを外し、「インスタンスの削除後、システムスナップショットとポイントインタイムの復元を含む自動バックアップが利用不可となることを了承しました。」のチェックにチェックを入れて、テキストボックスには delete me と入力して [<strong>削除</strong>] ボタンをクリック。</li>
 <li>ライターインスタンスとリーダーインスタンスが削除されると、リージョン別クラスターも自動で削除が実行されます。</li>
 <li>完全に削除が完了すると以下のような表記になります。課金を避けるためにも必ず時間をおいて全ての DB 識別子が削除されていることを確認しましょう。<br></li>
+<aside class="warning"><p><strong>RDS インスタンスは停止していると削除ができません。DB クラスターではなく、DB インスタンスを選択して削除してください。</strong></p>
+</aside>
 </ol>
 <p class="image-container"><img style="width: 750.00px" src="img\\9fb93bb024d5ce1d"></p>
 <ol type="1" start="5">
@@ -1642,25 +1664,47 @@ aurora-mysql-db-reader.cfqns4hpf8id.ap-northeast-1.rds.amazonaws.com. 5 IN A 10.
 
       </google-codelab-step>
     
-      <google-codelab-step label="補足 - MySQL の root パスワードを忘れた場合の復旧方法" duration="0">
-        <p>MariaDB の root パスワードを忘れた場合は、以下の手順で root パスワードを更新できます。</p>
-<h2 is-upgraded><strong>MariaDB が稼働しているサーバーにログインします。</strong></h2>
-<h2 is-upgraded><strong>以下の手順を実行します。</strong></h2>
-<h2 is-upgraded><strong>MariaDB をセーフモードで起動します。</strong></h2>
-<pre><code>$ sudo service mysqld stop
-$ mysqld_safe --skip-grant-tables &amp;</code></pre>
-<h2 is-upgraded><strong>MySQL に接続して、root のパスワードを変更します。</strong></h2>
+      <google-codelab-step label="補足 - QandA" duration="0">
+        <h2 is-upgraded>MySQL / MariaDB の root パスワードを忘れた場合の復旧方法</h2>
+        <p>MySQL / MariaDB の root パスワードを忘れた場合は、以下の手順で root パスワードを更新できます。</p>
+        <p>MariaDB が稼働しているサーバーにログインして、以下の通り、セーフモードで起動します。</p>
+<pre><code># systemctl stop mariadb.service
+# mysqld_safe --skip-grant-tables &amp;</code></pre>
+<p>MySQL に接続して、root のパスワードを変更します。</p>
 <pre><code>$ mysql -u root
-mysql&gt; use mysql;
-mysql&gt; update user set password=PASSWORD(&#34;ここに新しいパスワードを指定&#34;) where User=&#39;root&#39;; mysql&gt; commit;
-mysql&gt; flush privileges;
-mysql&gt; ¥q</code></pre>
-<h2 is-upgraded><strong>MariaDB を再起動します。</strong></h2>
-<pre><code>$ sudo systemctl stop mariadb
-$ sudo systemctl start mariadb</code></pre>
+&gt; use mysql;
+&gt; update user set password=PASSWORD(&#34;ここに新しいパスワードを指定&#34;) where User=&#39;root&#39;; mysql&gt; commit;
+&gt; flush privileges;
+&gt; ¥q</code></pre>
+<p>MariaDB を再起動します。</p>
+<pre><code># systemctl stop mariadb.service
+# systemctl start mariadb.service</code></pre>
 
 
-      </google-codelab-step>
+<h2 is-upgraded>プロンプトの表示について</h2>
+<p>セッションマネージャーの黒い画面にて</p>
+<pre><code>$</code></pre>
+<p>となっている場合は、root ユーザーに昇格できていません。一般的な操作ではありませんが、本ハンズオンは root に昇格して操作をしてください。</p>
+<pre><code>#</code></pre>
+<p>と表示された場合は、root ユーザーに昇格できています。</p>
+<pre><code>&gt;</code></pre>
+<p>の場合は mysql コマンドのプロンプトが表示されています。今、どの操作を行なっているのかよく分からなくなった場合は</p>
+<pre><code>&gt; exit;</code></pre>
+<p>か、または</p>
+<pre><code>&gt; \q</code></pre>
+<p>を入力して、[ENTER] キーを押下して抜けてください。</p>
+
+<h2 is-upgraded>セキュリティグループが見つからない場合の対処方法</h2>
+<p>フェーズ 2 以降でセキュリティグループが表示されなくなった場合 (セキュリティグループを見失った場合) は、セキュリティグループの一覧から VPC ID とセキュリティグループ ID を確認してください。</p>
+<p>まず、VPC の管理ページか、EC2 の管理ページにアクセスして左側のペインからセキュリティグループを開きます。</p>
+<p class="image-container"><img style="width: 670.00px" src="img\\screenshot202204270028.png"></p>
+<p>探しているセキュリティグループが見つかりましたら、本ハンズオンで作成した VPC と VPC ID が同一か確認してください。異なる場合は再作成してください。</p>
+
+<p>VPC ID が問題ない場合は、セキュリティグループ ID を控えておき、入力時にセキュリティグループ ID を入力して見つけてください。</p>
+
+<p class="image-container"><img style="width: 670.00px" src="img\\screenshot202204270029.png"></p>
+
+</google-codelab-step>
     
   </google-codelab>
 
